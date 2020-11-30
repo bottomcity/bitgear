@@ -1,38 +1,56 @@
 const BN = require("bn.js");
 
-const Token = artifacts.require("Token");
-const WETH9 = artifacts.require("WETH9");
+//const Token = artifacts.require("Token");
+//const WETH9 = artifacts.require("WETH9");
+const STAKING_BITGEAR = artifacts.require("StakingBitgear");
 
 require('dotenv').config();
 const {
     BITGEAR_ADDR,
+    TOKEN_KOVAN_ADDR,
+    WETH9_ADDR,
+    WETH9_KOVAN_ADDR,
     PAIR_BITGEAR_WETH_ADDR,
+    PAIR_BITGEAR_WETH_KOVAN_ADDR,
     DEBUG,
     SETTER,
-    WETH9_ADDR
 } = process.env;
 
-module.exports = async function (deployer) {
-    let TokenAddr;
-    let weth9Inst;
+let isKovanNetwork = true;
+const dayDurationSec = new BN(60 * 60 * 24);
+
+module.exports = async function (deployer, network, accounts) {
+    if (network == "test")
+        return;
 
     if (DEBUG == "true")
+        isKovanNetwork = true;
+
+    let zeroDayStartTime = new BN((await web3.eth.getBlock("latest")).timestamp);
+    let dayNumber = zeroDayStartTime.div(dayDurationSec);
+    zeroDayStartTime = dayDurationSec.mul(dayNumber);
+
+    let StakeingBitgearInst;
+    if (isKovanNetwork == true)
     {
-        await deployer.deploy(Token, "test", "TST");
-        TokenAddr = Token.deployed();
-        TokenAddr = TokenAddr.address
+        StakeingBitgearInst =
+            await deployer.deploy(
+                STAKING_BITGEAR,
+                PAIR_BITGEAR_WETH_KOVAN_ADDR,
+                TOKEN_KOVAN_ADDR,
+                zeroDayStartTime,
+                dayDurationSec
+            );
     }
     else
-        TokenAddr = BITGEAR_ADDR;
-
-    if (DEBUG == "true")
     {
-        await deployer.deploy(WETH9);
-        weth9Inst = WETH9.deployed();
+        StakeingBitgearInst =
+            await deployer.deploy(
+                STAKING_BITGEAR,
+                PAIR_BITGEAR_WETH_ADDR,
+                BITGEAR_ADDR,
+                zeroDayStartTime,
+                dayDurationSec
+            );
     }
-    else
-        uniswapPairAddr = PAIR_BITGEAR_WETH_ADDR;
-
-    console.log("Token addr = ", TokenAddr);
-    console.log("weth9 address = ", weth9Inst.address);
 };

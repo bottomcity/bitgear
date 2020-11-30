@@ -2,13 +2,13 @@
 
 pragma solidity ^0.6.0;
 
-import "openzeppelin-solidity/contracts/GSN/Context.sol";
+import "openzeppelin-solidity/contracts/access/Ownable.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 import "./uniswap/interface/IUniswapV2Pair.sol";
 
-contract StakingBitgear is Context
+contract StakingBitgear is Ownable
 {
     using SafeMath for uint256;
 
@@ -20,6 +20,14 @@ contract StakingBitgear is Context
     uint256 public dayDurationSec;
     uint256 constant public numDaysInMonth = 30;
     uint256 constant public monthsInYear = 12;
+    modifier onlyWhenOpen
+    {
+        require(
+            now >= zeroDayStartTime,
+            "StakingBitgear: Contract is not open yet"
+        );
+        _;
+    }
 
     uint256 public allLpTokensStaked;
     uint256 public allGearTokens;
@@ -32,10 +40,10 @@ contract StakingBitgear is Context
     event TokenFreezed(address who, uint256 amount, uint256 day);
     event TokenUnfreezed(address who, uint256 amount, uint256 day);
 
-    uint256 internal stakeIdLast;
-    uint256 internal maxNumMonths = 3;
-    uint256[] internal MonthsApyPercentsNumerator = [15, 20, 30];
-    uint256[] internal MonthsApyPercentsDenominator = [100, 100, 100];
+    uint256 public stakeIdLast;
+    uint256 constant public maxNumMonths = 3;
+    uint256[] public MonthsApyPercentsNumerator = [15, 20, 30];
+    uint256[] public MonthsApyPercentsDenominator = [100, 100, 100];
     struct StakeInfo
     {
         uint256 stakeId;
@@ -45,7 +53,7 @@ contract StakingBitgear is Context
         uint256 stakedGear;
         uint256 freezedRewardGearTokens;
     }
-    mapping(address => StakeInfo[]) stakeList;
+    mapping(address => StakeInfo[]) public stakeList;
     event StakeStart(
         address who,
         uint256 LpIncome,
@@ -82,10 +90,23 @@ contract StakingBitgear is Context
         );
         zeroDayStartTime = _zeroDayStartTime;
         dayDurationSec = _dayDurationSec;
-        ifGearZeroTokenInPair = (pair.token0() == address(gearAddress));
+        ifGearZeroTokenInPair = (token0 == address(gearAddress));
+        _testMonthsApyPercents();
     }
 
-    function stakeStart(uint256 amount, uint256 numMonthsStake) external
+    function gearTokenDonation(uint256 amount) external
+    {
+        address sender = _msgSender();
+        require(
+            gearAddress.transferFrom(sender, address(this), amount),
+            "StakingBitgear: Could not get gear tokens"
+        );
+        allGearTokens = allGearTokens.add(amount);
+        unfreezedGearTokens = unfreezedGearTokens.add(amount);
+        emit GearTokenIncome(sender, amount, _currentDay());
+    }
+
+    function stakeStart(uint256 amount, uint256 numMonthsStake) external onlyWhenOpen
     {
         require(
             numMonthsStake > 0 && numMonthsStake <= maxNumMonths,
@@ -140,7 +161,7 @@ contract StakingBitgear is Context
         );
     }
 
-    function stakeEnd(uint256 stakeIndex, uint256 stakeId) external
+    function stakeEnd(uint256 stakeIndex, uint256 stakeId) external onlyWhenOpen
     {
         address sender = _msgSender();
         require(
@@ -190,9 +211,26 @@ contract StakingBitgear is Context
         return stakeList[who].length;
     }
 
-    function currentDay() external view returns(uint256)
+    function currentDay() external view onlyWhenOpen returns(uint256)
     {
         return _currentDay();
+    }
+
+    function changeMonthsApyPercents(
+        uint256 month,
+        uint256 numerator,
+        uint256 denominator
+    )
+        external
+        onlyOwner
+    {
+        require(
+            month > 0 && month <= maxNumMonths,
+            "StakingBitgear: Wrong month"
+        );
+        MonthsApyPercentsNumerator[month.sub(1)] = numerator;
+        MonthsApyPercentsDenominator[month.sub(1)] = denominator;
+        _testMonthsApyPercents();
     }
 
     function _currentDay() private view returns(uint256)
@@ -239,5 +277,38 @@ contract StakingBitgear is Context
                     .div(MonthsApyPercentsDenominator[month - 1]);
         }
         return reward;
+    }
+
+    function _testMonthsApyPercents() private view
+    {
+        uint256 amount = 100000;
+        require(
+            maxNumMonths == 3,
+            "StakingBitgear: Wrong MonthsApyPercents parameters"
+        );
+        require(
+            amount
+                .mul(MonthsApyPercentsNumerator[0])
+                .div(MonthsApyPercentsDenominator[0])
+                >=
+            amount.mul(5).div(100),
+            "StakingBitgear: Wrong MonthsApyPercents parameters"
+        );
+        require(
+            amount
+                .mul(MonthsApyPercentsNumerator[1])
+                .div(MonthsApyPercentsDenominator[1])
+                >=
+            amount.mul(7).div(100),
+            "StakingBitgear: Wrong MonthsApyPercents parameters"
+        );
+        require(
+            amount
+                .mul(MonthsApyPercentsNumerator[2])
+                .div(MonthsApyPercentsDenominator[2])
+                >=
+            amount.mul(10).div(100),
+            "StakingBitgear: Wrong MonthsApyPercents parameters"
+        );
     }
 }
