@@ -40,7 +40,7 @@ contract StakingBitgear is Ownable
     event TokenFreezed(address who, uint256 amount, uint256 day);
     event TokenUnfreezed(address who, uint256 amount, uint256 day);
 
-    uint256 public stakeIdLast;
+    uint256 private stakeIdLast;
     uint256 constant public maxNumMonths = 3;
     uint256[] public MonthsApyPercentsNumerator = [15, 20, 30];
     uint256[] public MonthsApyPercentsDenominator = [100, 100, 100];
