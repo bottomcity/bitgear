@@ -40,7 +40,7 @@ contract StakingBitgear is Ownable
     event TokenFreezed(address who, uint256 amount, uint256 day);
     event TokenUnfreezed(address who, uint256 amount, uint256 day);
 
-    uint256 private stakeIdLast;
+    uint256 public stakeIdLast;
     uint256 constant public maxNumMonths = 3;
     uint256[] public MonthsApyPercentsNumerator = [15, 20, 30];
     uint256[] public MonthsApyPercentsDenominator = [100, 100, 100];
@@ -174,9 +174,7 @@ contract StakingBitgear is Ownable
             "StakingBitgear: Wrong stakeId"
         );
         uint256 currDay = _currentDay();
-        uint256 servedNumOfMonths = currDay.sub(st.startDay).div(numDaysInMonth);
-        if (servedNumOfMonths > st.numMonthsStake)
-            servedNumOfMonths = st.numMonthsStake;
+        uint256 servedNumOfMonths = _getServedMonths(currDay, st.startDay, st.numMonthsStake);
         uint256 gearTokensToReturn = _getGearEarnings(st.stakedGear, servedNumOfMonths);
         require(
             st.freezedRewardGearTokens >= gearTokensToReturn,
@@ -216,6 +214,11 @@ contract StakingBitgear is Ownable
         return _currentDay();
     }
 
+    function getDayUnixTime(uint256 day) public view returns(uint256)
+    {
+        return zeroDayStartTime.add(day.mul(dayDurationSec));
+    }
+
     function changeMonthsApyPercents(
         uint256 month,
         uint256 numerator,
@@ -233,27 +236,72 @@ contract StakingBitgear is Ownable
         _testMonthsApyPercents();
     }
 
-    function _currentDay() private view returns(uint256)
+    function getEndDayOfStakeInUnixTime(
+        address who,
+        uint256 stakeIndex,
+        uint256 stakeId
+    )
+        external
+        view
+        returns(uint256)
     {
-        return now.sub(zeroDayStartTime).div(dayDurationSec);
-    }
-
-    function _removeStake(uint256 stakeIndex, uint256 stakeId) private
-    {
-        address sender = _msgSender();
-        uint256 stakeListLength = stakeList[sender].length;
         require(
-            stakeIndex >= 0 && stakeIndex < stakeListLength,
+            stakeIndex < stakeList[who].length,
             "StakingBitgear: Wrong stakeIndex"
         );
-        StakeInfo storage st = stakeList[sender][stakeIndex];
         require(
-            st.stakeId == stakeId,
+            stakeId == stakeList[who][stakeIndex].stakeId,
             "StakingBitgear: Wrong stakeId"
         );
-        if (stakeIndex < stakeListLength - 1)
-            stakeList[sender][stakeIndex] = stakeList[sender][stakeListLength - 1];
-        stakeList[sender].pop();
+
+        return getDayUnixTime(
+            stakeList[who][stakeIndex].startDay.add(
+                stakeList[who][stakeIndex].numMonthsStake.mul(
+                    numDaysInMonth
+                )
+            )
+        );
+    }
+
+    function getStakeDivsNow(
+        address who,
+        uint256 stakeIndex,
+        uint256 stakeId
+    )
+        external
+        view
+        returns(uint256)
+    {
+        require(
+            stakeIndex < stakeList[who].length,
+            "StakingBitgear: Wrong stakeIndex"
+        );
+        require(
+            stakeId == stakeList[who][stakeIndex].stakeId,
+            "StakingBitgear: Wrong stakeId"
+        );
+
+        uint256 currDay = _currentDay();
+        uint256 servedMonths = _getServedMonths(
+            currDay,
+            stakeList[who][stakeIndex].startDay,
+            stakeList[who][stakeIndex].numMonthsStake
+        );
+        return _getGearEarnings(stakeList[who][stakeIndex].stakedGear, servedMonths);
+    }
+
+    function _getServedMonths(
+        uint256 currDay,
+        uint256 startDay,
+        uint256 numMonthsStake
+    )
+        private
+        pure
+        returns(uint256 servedMonths)
+    {
+        servedMonths = currDay.sub(startDay).div(numDaysInMonth);
+        if (servedMonths > numMonthsStake)
+            servedMonths = numMonthsStake;
     }
 
     function _getGearEarnings(
@@ -277,6 +325,29 @@ contract StakingBitgear is Ownable
                     .div(MonthsApyPercentsDenominator[month - 1]);
         }
         return reward;
+    }
+
+    function _currentDay() private view returns(uint256)
+    {
+        return now.sub(zeroDayStartTime).div(dayDurationSec);
+    }
+
+    function _removeStake(uint256 stakeIndex, uint256 stakeId) private
+    {
+        address sender = _msgSender();
+        uint256 stakeListLength = stakeList[sender].length;
+        require(
+            stakeIndex >= 0 && stakeIndex < stakeListLength,
+            "StakingBitgear: Wrong stakeIndex"
+        );
+        StakeInfo storage st = stakeList[sender][stakeIndex];
+        require(
+            st.stakeId == stakeId,
+            "StakingBitgear: Wrong stakeId"
+        );
+        if (stakeIndex < stakeListLength - 1)
+            stakeList[sender][stakeIndex] = stakeList[sender][stakeListLength - 1];
+        stakeList[sender].pop();
     }
 
     function _testMonthsApyPercents() private view

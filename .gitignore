@@ -3,3 +3,4 @@ node_modules/
 .env
 *.svg
 *.png
+test.json
