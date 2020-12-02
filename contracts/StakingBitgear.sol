@@ -313,7 +313,7 @@ contract StakingBitgear is Ownable
         returns (uint256 reward)
     {
         require(
-            numOfMonths > 0 && numOfMonths <= maxNumMonths,
+            numOfMonths >= 0 && numOfMonths <= maxNumMonths,
             "StakingBitgear: Wrong numOfMonths"
         );
         for (uint256 month = 1; month <= numOfMonths; ++month)
