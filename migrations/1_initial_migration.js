@@ -8,30 +8,29 @@ require('dotenv').config();
 const {
     BITGEAR_ADDR,
     TOKEN_KOVAN_ADDR,
+    TOKEN_ROPSTEN_ADDR,
     WETH9_ADDR,
     WETH9_KOVAN_ADDR,
+    WETH9_ROPSTEN_ADDR,
     PAIR_BITGEAR_WETH_ADDR,
     PAIR_BITGEAR_WETH_KOVAN_ADDR,
+    PAIR_BITGEAR_WETH_ROPSTEN_ADDR,
     DEBUG,
     SETTER,
 } = process.env;
 
-let isKovanNetwork = true;
 const dayDurationSec = new BN(60 * 60 * 24);
 
 module.exports = async function (deployer, network, accounts) {
     if (network == "test")
         return;
 
-    if (DEBUG == "true")
-        isKovanNetwork = true;
-
     let zeroDayStartTime = new BN((await web3.eth.getBlock("latest")).timestamp);
     let dayNumber = zeroDayStartTime.div(dayDurationSec);
     zeroDayStartTime = dayDurationSec.mul(dayNumber);
 
     let StakeingBitgearInst;
-    if (isKovanNetwork == true)
+    if (network == "kovan")
     {
         StakeingBitgearInst =
             await deployer.deploy(
@@ -42,7 +41,18 @@ module.exports = async function (deployer, network, accounts) {
                 dayDurationSec
             );
     }
-    else
+    else if (network == "ropsten")
+    {
+        StakeingBitgearInst =
+            await deployer.deploy(
+                STAKING_BITGEAR,
+                PAIR_BITGEAR_WETH_ROPSTEN_ADDR,
+                TOKEN_ROPSTEN_ADDR,
+                zeroDayStartTime,
+                dayDurationSec
+            );
+    }
+    else if (network == "mainnet")
     {
         StakeingBitgearInst =
             await deployer.deploy(
