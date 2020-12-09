@@ -1,5 +1,7 @@
 const HDWalletProvider = require('truffle-hdwallet-provider');
 
+const BN = require("bn.js");
+
 require('dotenv').config();
 const {
     ETHERSCAN_API_KEY,
@@ -32,7 +34,7 @@ module.exports = {
         mainnet: {
             provider: () => new HDWalletProvider(MNEMONIC, 'https://mainnet.infura.io/v3/' + INFURA_ID_PROJECT),
             network_id: 1,
-            gasPrice: web3.utils.toWei(DEPLOY_GAS_PRICE, 'gwei'),
+            gasPrice: web3.utils.toWei(new BN(DEPLOY_GAS_PRICE), 'gwei'),
             gas: DEPLOY_GAS_LIMIT,
             skipDryRun: false
         },

@@ -106,6 +106,30 @@ contract StakingBitgear is Ownable
         emit GearTokenIncome(sender, amount, _currentDay());
     }
 
+    function gearOwnerWithdraw(uint256 amount) external onlyOwner
+    {
+        address sender = _msgSender();
+        require(
+            sender == owner(),
+            "StakingBitgear: Sender is not owner"
+        );
+        require(
+            allGearTokens > amount,
+            "StakingBitgear: Not enough value on this contract"
+        );
+        require(
+            unfreezedGearTokens > amount,
+            "StakingBitgear: Not enough unfreezed value on this contract"
+        );
+        require(
+            gearAddress.transfer(sender, amount),
+            "StakingBitgear: Could not send gear tokens"
+        );
+        allGearTokens = allGearTokens.sub(amount);
+        unfreezedGearTokens = unfreezedGearTokens.sub(amount);
+        emit GearTokenOutcome(sender, amount, _currentDay());
+    }
+
     function stakeStart(uint256 amount, uint256 numMonthsStake) external onlyWhenOpen
     {
         require(
